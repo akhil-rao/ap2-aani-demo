@@ -1,9 +1,3 @@
-
----
-
-## 🐍 Full `PaymentLabs_AP2_Aani_Demo.py`
-
-```python
 """
 Streamlit MVP Prototype: AP2 mandates + Aani-style payment simulation
 Filename: PaymentLabs_AP2_Aani_Demo.py
