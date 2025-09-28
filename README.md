@@ -1,31 +1,39 @@
-# AP2 + Aani Demo (MVP Prototype)
+# AP2 + Aani Open Finance Demo
 
-This is a sandbox-style **Streamlit demo** showing how **AP2 mandates** can work on top of **Aani payments**.  
-It is **not production-ready** — just a clickable prototype for demonstration.
+This is a sandbox-style demo showing how **AP2 mandate logic** can work on top of **Aani payments** in an **Open Finance** context.  
+It is intended as an MVP prototype for demos with stakeholders (e.g., CBUAE).
 
-## Features
+---
 
-- **Consent Screen** → User approves an `IntentMandate` (e.g., AED 500 via Aani).
-- **Mandate Registry** → View mandates (`CartMandate`, `IntentMandate`, `PaymentMandate`).
-- **Payment Execution** → Simulate settlement using a mocked Aani API.
-- **Audit Trail** → Records *Signed Mandate + Agent Identity + Transaction ID*.
+## 🚀 Features
 
-## Demo Flow
+- **User Consent Screen** → User approves an IntentMandate (e.g., AED 500 via Aani).  
+- **CBUAE Consent Registration** → Consent is mock-registered with the CBUAE API Hub.  
+- **Mandate Registry View** → Shows all issued mandates (CartMandate, IntentMandate, PaymentMandate).  
+- **Risk & AML Check** → Simulated sanctions/AML screening with colored results:  
+  - ✅ Green → Low Risk  
+  - ⚠️ Amber → Medium Risk  
+  - ❌ Red → High Risk  
+- **Payment Execution Simulation** → Mock settlement via Aani (instant) or UAEFTS/RTGS (high value).  
+- **Audit Trail View** → Complete trace with signed mandate, agent identity, transaction ID, and CBUAE registration log.  
 
-1. **Consent Screen**: Create an IntentMandate (user approves).  
-2. **Mandate Registry**: Inspect, convert Intent → Payment, revoke, or export JSON.  
-3. **Payment Execution**: Run a mocked Aani payment call (returns transaction id + status).  
-4. **Audit Trail**: View chronological signed events with dummy HMAC signatures.
+---
 
-## Run Locally
+## 🖼️ Workflow Diagram
+
+![Workflow Diagram](https://raw.githubusercontent.com/akhil-rao/ap2-aani-demo/main/Demo%20env%20workflow.png)
+
+---
+
+## ▶️ Running the Demo
+
+You don’t need to install anything locally if using **Streamlit Cloud**.  
+Just deploy this repo on [Streamlit Cloud](https://streamlit.io/cloud) and it will automatically install dependencies from `requirements.txt`.  
+
+If you want to run locally:  
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/<your-username>/ap2-aani-demo.git
+git clone https://github.com/akhil-rao/ap2-aani-demo.git
 cd ap2-aani-demo
-
-# 2. Install dependencies
 pip install -r requirements.txt
-
-# 3. Run the Streamlit app
 streamlit run PaymentLabs_AP2_Aani_Demo.py
