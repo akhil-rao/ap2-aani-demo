@@ -2,12 +2,10 @@
 Streamlit MVP Prototype: AP2 mandates + Aani-style payment simulation
 Filename: PaymentLabs_AP2_Aani_Demo.py
 
-Polished improvements:
-- Global Oxanium font across app.
-- Graphviz workflow diagram updated with professional color scheme.
-- User node icon-like style, Aani node in blue, audit in green.
-- Headers styled bolder (Oxanium 600 weight).
-- Overall polished look for enterprise/demo readiness.
+Latest Update:
+- PlantUML workflow now rendered as an actual diagram via PlantUML server.
+- No raw PlantUML text shown, only a professional diagram.
+- Full workflow steps implemented: Consent → CBUAE → Registry → Risk → Payment → Audit.
 """
 
 import streamlit as st
@@ -20,6 +18,7 @@ import hashlib
 import hmac
 import base64
 import random
+import urllib.parse
 
 # ---------------------------
 # Utility helpers
@@ -33,7 +32,7 @@ def sign_payload(payload: Dict[str, Any], secret: str = "demo_secret_key") -> st
     digest = hmac.new(secret.encode(), payload_json, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(digest).decode()
 
-def mock_aani_payment_api(mandate: Dict[str, Any]) -> Dict[str, Any]:
+def mock_aani_payment_api(mandate: Dict[str, Any], rail: str) -> Dict[str, Any]:
     txid = "TX-" + uuid.uuid4().hex[:12].upper()
     status = random.choice(["SETTLED", "PENDING", "FAILED"])
     response = {
@@ -42,7 +41,8 @@ def mock_aani_payment_api(mandate: Dict[str, Any]) -> Dict[str, Any]:
         "settlement_time": now_iso() if status == "SETTLED" else None,
         "amount": mandate.get("amount"),
         "currency": mandate.get("currency", "AED"),
-        "meta": {"processor": "Aani-mock", "mode": "test"}
+        "rail": rail,
+        "meta": {"processor": "Aani-mock" if rail == "Aani" else "UAEFTS-mock", "mode": "test"}
     }
     return response
 
@@ -90,7 +90,6 @@ if "workflow_step" not in st.session_state:
 
 st.set_page_config(page_title="AP2 + Aani Open Finance Demo", layout="wide")
 
-# Inject Oxanium font with bolder headers
 st.markdown(
     """
     <style>
@@ -116,7 +115,7 @@ def go_to(step):
 step = st.session_state.workflow_step
 
 # ---------------------------
-# Landing Page
+# Landing Page with PlantUML Diagram (rendered)
 # ---------------------------
 
 if step == "Landing":
@@ -125,30 +124,38 @@ if step == "Landing":
     ### Introduction
     This sandbox demonstrates how **AP2 mandate logic** works on top of **Aani payments** in an **Open Finance** context.
 
-    **Workflow**:
+    **Workflow implemented in this demo:**
     1. User Consent (IntentMandate)
-    2. Mandate Registry
-    3. Payment Execution (mock Aani)
-    4. Audit Trail
+    2. CBUAE Consent Registration (mock)
+    3. Mandate Registry
+    4. Risk & AML Check (mock)
+    5. Payment Execution (choose rail: Aani or UAEFTS)
+    6. Audit Trail
     """)
 
-    # Graphviz workflow diagram with styled nodes
     st.subheader("Workflow Diagram")
-    workflow = """
-    digraph {
-      rankdir=LR;
-      node [shape=box, style="rounded,filled", fontname="Oxanium"];
 
-      User [label="User", shape=circle, fillcolor=lightblue, style=filled, color=black];
-      Consent [label="User Consent\\n(IntentMandate)", fillcolor=white, color=black];
-      Registry [label="Mandate Registry", fillcolor=lightgrey, color=black];
-      Payment [label="Payment Execution\\n(Aani)", fillcolor=lightblue, color=blue, fontcolor=black];
-      Audit [label="Audit Trail", fillcolor=lightgreen, color=darkgreen, fontcolor=black];
+    plantuml = """
+    @startuml
+    skinparam shadowing false
+    skinparam defaultFontName Oxanium
 
-      User -> Consent -> Registry -> Payment -> Audit;
-    }
+    actor User
+    User -> "Consent Engine" : Approves IntentMandate
+    "Consent Engine" -> "CBUAE API Hub" : Registers Consent
+    "Consent Engine" -> "Mandate Registry" : Stores Mandates
+    "Mandate Registry" -> "Risk & AML Check" : Send for Screening
+    "Risk & AML Check" -> "Payment Agent" : Risk Cleared
+    "Payment Agent" -> "Aani Rail" : Execute (Instant A2A)
+    "Payment Agent" -> "UAEFTS/RTGS Rail" : Execute (High Value)
+    "Payment Agent" -> "Audit Service" : Log Transaction
+    @enduml
     """
-    st.graphviz_chart(workflow)
+
+    plantuml_encoded = urllib.parse.quote(plantuml)
+    plantuml_url = f"http://www.plantuml.com/plantuml/png/{plantuml_encoded}"
+
+    st.image(plantuml_url, caption="AP2 + UAE Aani/Open Finance Workflow", use_container_width=True)
 
     if st.button("Start Demo"):
         go_to("Consent")
@@ -190,7 +197,13 @@ elif step == "Consent":
             "timestamp": now_iso(),
             "signature": signed,
         })
-        st.success(f"IntentMandate {mandate_id} issued and recorded.")
+        st.session_state.audit_log.append({
+            "event": "CBUAE_CONSENT_REGISTERED",
+            "mandate_id": mandate.mandate_id,
+            "timestamp": now_iso(),
+            "note": "Consent registered with CBUAE API Hub (mock)"
+        })
+        st.success(f"IntentMandate {mandate_id} issued and registered with CBUAE.")
 
     if st.button("Next Step → Mandate Registry"):
         go_to("Registry")
@@ -207,16 +220,31 @@ elif step == "Registry":
     else:
         rows = [{"mandate_id": m.mandate_id, "type": m.mandate_type, "amount": f"{m.amount:.2f}", "currency": m.currency, "status": m.status, "issued_by": m.issued_by, "created_at": m.created_at} for m in mandates]
         st.table(rows)
-        sel = st.selectbox("Select a mandate to inspect", options=[m.mandate_id for m in mandates])
-        sel_mandate = next((m for m in mandates if m.mandate_id == sel), None)
-        if sel_mandate:
-            st.json(sel_mandate.to_dict())
-            if st.button("Convert Intent → Payment"):
-                if sel_mandate.mandate_type == "IntentMandate":
-                    sel_mandate.mandate_type = "PaymentMandate"
-                    sel_mandate.status = "ISSUED"
-                    st.session_state.audit_log.append({"event": "INTENT_CONVERTED", "mandate_id": sel_mandate.mandate_id, "timestamp": now_iso()})
-                    st.success("Converted to PaymentMandate.")
+    if st.button("Next Step → Risk & AML Check"):
+        go_to("RiskAML")
+
+# ---------------------------
+# Risk & AML Check
+# ---------------------------
+
+elif step == "RiskAML":
+    st.header("Step 3 — Risk & AML Check")
+    mandates = [m for m in st.session_state.mandates if m.status in ("ACTIVE", "ISSUED")]
+    if not mandates:
+        st.info("No mandates available for risk check.")
+    else:
+        sel_id = st.selectbox("Choose mandate to risk screen", options=[m.mandate_id for m in mandates])
+        mandate = next(m for m in mandates if m.mandate_id == sel_id)
+        if st.button("Run Risk Screening"):
+            risk = random.choice(["LOW", "MEDIUM", "HIGH"])
+            st.session_state.audit_log.append({
+                "event": "RISK_CHECK",
+                "mandate_id": mandate.mandate_id,
+                "risk_level": risk,
+                "timestamp": now_iso(),
+                "note": "Sanctions & AML screening simulated"
+            })
+            st.success(f"Risk screening complete. Risk level: {risk}")
     if st.button("Next Step → Payment Execution"):
         go_to("Payment")
 
@@ -225,29 +253,29 @@ elif step == "Registry":
 # ---------------------------
 
 elif step == "Payment":
-    st.header("Step 3 — Payment Execution")
-    available = [m for m in st.session_state.mandates if m.mandate_type == "PaymentMandate" and m.status in ("ACTIVE", "ISSUED")]
+    st.header("Step 4 — Payment Execution")
+    available = [m for m in st.session_state.mandates if m.mandate_type in ("PaymentMandate", "IntentMandate") and m.status in ("ACTIVE", "ISSUED")]
     if not available:
-        st.info("No PaymentMandates available. Convert one in Registry.")
+        st.info("No mandates available. Create or convert one earlier.")
     else:
-        options = {m.mandate_id: m for m in available}
-        sel_id = st.selectbox("Choose mandate to execute", options=list(options.keys()))
-        mandate = options[sel_id]
-        st.json(mandate.to_dict())
-        if st.button("Execute Payment (mock Aani)"):
-            response = mock_aani_payment_api(mandate.to_dict())
+        sel_id = st.selectbox("Choose mandate to execute", options=[m.mandate_id for m in available])
+        mandate = next(m for m in available if m.mandate_id == sel_id)
+        rail = st.selectbox("Select Settlement Rail", ["Aani", "UAEFTS/RTGS"])
+        if st.button("Execute Payment"):
+            response = mock_aani_payment_api(mandate.to_dict(), rail)
             mandate.status = response["status"]
             st.session_state.audit_log.append({
                 "event": "PAYMENT_EXECUTED",
                 "mandate_id": mandate.mandate_id,
                 "transaction_id": response["transaction_id"],
                 "status": response["status"],
+                "rail": rail,
                 "timestamp": now_iso(),
                 "agent": st.session_state.agent_identity,
                 "signature": sign_payload({"mandate_id": mandate.mandate_id, "txid": response["transaction_id"]}),
                 "response": response,
             })
-            st.success(f"Payment executed. Transaction {response['transaction_id']} → {response['status']}")
+            st.success(f"Payment executed on {rail}. Transaction {response['transaction_id']} → {response['status']}")
             st.json(response)
     if st.button("Next Step → Audit Trail"):
         go_to("Audit")
@@ -257,7 +285,7 @@ elif step == "Payment":
 # ---------------------------
 
 elif step == "Audit":
-    st.header("Step 4 — Audit Trail")
+    st.header("Step 5 — Audit Trail")
     logs = list(reversed(st.session_state.audit_log))
     if not logs:
         st.info("No audit events yet.")
