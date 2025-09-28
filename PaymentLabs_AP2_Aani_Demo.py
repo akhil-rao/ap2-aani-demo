@@ -2,10 +2,12 @@
 Streamlit MVP Prototype: AP2 mandates + Aani-style payment simulation
 Filename: PaymentLabs_AP2_Aani_Demo.py
 
-New improvement:
-- Added an **Introduction Page** as landing screen with "Start Demo" button.
-- User begins at Intro page and can only proceed forward.
-- Workflow: Intro → Step 1 (Consent) → Step 2 (Registry) → Step 3 (Payment) → Step 4 (Audit) → Restart.
+Polished improvements:
+- Global Oxanium font across app.
+- Graphviz workflow diagram updated with professional color scheme.
+- User node icon-like style, Aani node in blue, audit in green.
+- Headers styled bolder (Oxanium 600 weight).
+- Overall polished look for enterprise/demo readiness.
 """
 
 import streamlit as st
@@ -83,10 +85,26 @@ if "workflow_step" not in st.session_state:
     st.session_state.workflow_step = "Landing"
 
 # ---------------------------
-# Page Config
+# Page Config + Custom Font
 # ---------------------------
 
 st.set_page_config(page_title="AP2 + Aani Open Finance Demo", layout="wide")
+
+# Inject Oxanium font with bolder headers
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700&display=swap');
+    html, body, [class*="css"]  {
+        font-family: 'Oxanium', sans-serif;
+    }
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 700 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ---------------------------
 # Navigation helper
@@ -113,7 +131,26 @@ if step == "Landing":
     3. Payment Execution (mock Aani)
     4. Audit Trail
     """)
-    if st.button("🚀 Start Demo"):
+
+    # Graphviz workflow diagram with styled nodes
+    st.subheader("Workflow Diagram")
+    workflow = """
+    digraph {
+      rankdir=LR;
+      node [shape=box, style="rounded,filled", fontname="Oxanium"];
+
+      User [label="User", shape=circle, fillcolor=lightblue, style=filled, color=black];
+      Consent [label="User Consent\\n(IntentMandate)", fillcolor=white, color=black];
+      Registry [label="Mandate Registry", fillcolor=lightgrey, color=black];
+      Payment [label="Payment Execution\\n(Aani)", fillcolor=lightblue, color=blue, fontcolor=black];
+      Audit [label="Audit Trail", fillcolor=lightgreen, color=darkgreen, fontcolor=black];
+
+      User -> Consent -> Registry -> Payment -> Audit;
+    }
+    """
+    st.graphviz_chart(workflow)
+
+    if st.button("Start Demo"):
         go_to("Consent")
 
 # ---------------------------
