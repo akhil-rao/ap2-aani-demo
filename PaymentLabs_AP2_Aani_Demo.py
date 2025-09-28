@@ -1,11 +1,17 @@
+
+---
+
+## 🐍 Full `PaymentLabs_AP2_Aani_Demo.py`
+
+```python
 """
 Streamlit MVP Prototype: AP2 mandates + Aani-style payment simulation
 Filename: PaymentLabs_AP2_Aani_Demo.py
 
-Latest Update:
-- PlantUML workflow now rendered as an actual diagram via PlantUML server.
-- No raw PlantUML text shown, only a professional diagram.
-- Full workflow steps implemented: Consent → CBUAE → Registry → Risk → Payment → Audit.
+Final version:
+- Static PNG workflow diagram embedded on Landing Page (from GitHub).
+- All steps: Consent -> CBUAE registration -> Registry -> Risk/AML -> Payment (Aani/UAEFTS) -> Audit.
+- Notes added for risk color coding and CBUAE registration (mock).
 """
 
 import streamlit as st
@@ -18,12 +24,10 @@ import hashlib
 import hmac
 import base64
 import random
-import urllib.parse
 
 # ---------------------------
 # Utility helpers
 # ---------------------------
-
 def now_iso():
     return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
@@ -49,7 +53,6 @@ def mock_aani_payment_api(mandate: Dict[str, Any], rail: str) -> Dict[str, Any]:
 # ---------------------------
 # Data models
 # ---------------------------
-
 @dataclass
 class Mandate:
     mandate_id: str
@@ -67,7 +70,6 @@ class Mandate:
 # ---------------------------
 # Initialize session state
 # ---------------------------
-
 if "mandates" not in st.session_state:
     st.session_state.mandates = []
 
@@ -87,7 +89,6 @@ if "workflow_step" not in st.session_state:
 # ---------------------------
 # Page Config + Custom Font
 # ---------------------------
-
 st.set_page_config(page_title="AP2 + Aani Open Finance Demo", layout="wide")
 
 st.markdown(
@@ -108,16 +109,14 @@ st.markdown(
 # ---------------------------
 # Navigation helper
 # ---------------------------
-
 def go_to(step):
     st.session_state.workflow_step = step
 
 step = st.session_state.workflow_step
 
 # ---------------------------
-# Landing Page with PlantUML Diagram (rendered)
+# Landing Page with PNG from GitHub
 # ---------------------------
-
 if step == "Landing":
     st.title("AP2 + Open Finance + Aani — Sandbox Demo")
     st.markdown("""
@@ -133,29 +132,15 @@ if step == "Landing":
     6. Audit Trail
     """)
 
-    st.subheader("Workflow Diagram")
+    st.subheader("Workflow Diagram (implemented steps)")
+    st.image(
+        "https://raw.githubusercontent.com/akhil-rao/ap2-aani-demo/main/Demo%20env%20workflow.png",
+        caption="AP2 + UAE Aani/Open Finance Workflow",
+        use_container_width=True
+    )
 
-    plantuml = """
-    @startuml
-    skinparam shadowing false
-    skinparam defaultFontName Oxanium
-
-    actor User
-    User -> "Consent Engine" : Approves IntentMandate
-    "Consent Engine" -> "CBUAE API Hub" : Registers Consent
-    "Consent Engine" -> "Mandate Registry" : Stores Mandates
-    "Mandate Registry" -> "Risk & AML Check" : Send for Screening
-    "Risk & AML Check" -> "Payment Agent" : Risk Cleared
-    "Payment Agent" -> "Aani Rail" : Execute (Instant A2A)
-    "Payment Agent" -> "UAEFTS/RTGS Rail" : Execute (High Value)
-    "Payment Agent" -> "Audit Service" : Log Transaction
-    @enduml
-    """
-
-    plantuml_encoded = urllib.parse.quote(plantuml)
-    plantuml_url = f"http://www.plantuml.com/plantuml/png/{plantuml_encoded}"
-
-    st.image(plantuml_url, caption="AP2 + UAE Aani/Open Finance Workflow", use_container_width=True)
+    st.caption("**Note:** Risk screening results: LOW = Green, MEDIUM = Amber, HIGH = Red. "
+               "Consent registration with CBUAE is simulated for demo purposes.")
 
     if st.button("Start Demo"):
         go_to("Consent")
@@ -163,7 +148,6 @@ if step == "Landing":
 # ---------------------------
 # Consent Screen
 # ---------------------------
-
 elif step == "Consent":
     st.header("Step 1 — User Consent: Create an IntentMandate")
     with st.form("consent_form"):
@@ -197,6 +181,7 @@ elif step == "Consent":
             "timestamp": now_iso(),
             "signature": signed,
         })
+        # simulate CBUAE consent registration
         st.session_state.audit_log.append({
             "event": "CBUAE_CONSENT_REGISTERED",
             "mandate_id": mandate.mandate_id,
@@ -211,7 +196,6 @@ elif step == "Consent":
 # ---------------------------
 # Mandate Registry
 # ---------------------------
-
 elif step == "Registry":
     st.header("Step 2 — Mandate Registry")
     mandates = st.session_state.mandates
@@ -226,7 +210,6 @@ elif step == "Registry":
 # ---------------------------
 # Risk & AML Check
 # ---------------------------
-
 elif step == "RiskAML":
     st.header("Step 3 — Risk & AML Check")
     mandates = [m for m in st.session_state.mandates if m.status in ("ACTIVE", "ISSUED")]
@@ -244,14 +227,18 @@ elif step == "RiskAML":
                 "timestamp": now_iso(),
                 "note": "Sanctions & AML screening simulated"
             })
-            st.success(f"Risk screening complete. Risk level: {risk}")
+            if risk == "LOW":
+                st.success(f"Risk screening complete. Risk level: {risk}")
+            elif risk == "MEDIUM":
+                st.warning(f"Risk screening complete. Risk level: {risk}")
+            else:
+                st.error(f"Risk screening complete. Risk level: {risk}")
     if st.button("Next Step → Payment Execution"):
         go_to("Payment")
 
 # ---------------------------
 # Payment Execution
 # ---------------------------
-
 elif step == "Payment":
     st.header("Step 4 — Payment Execution")
     available = [m for m in st.session_state.mandates if m.mandate_type in ("PaymentMandate", "IntentMandate") and m.status in ("ACTIVE", "ISSUED")]
@@ -283,7 +270,6 @@ elif step == "Payment":
 # ---------------------------
 # Audit Trail
 # ---------------------------
-
 elif step == "Audit":
     st.header("Step 5 — Audit Trail")
     logs = list(reversed(st.session_state.audit_log))
