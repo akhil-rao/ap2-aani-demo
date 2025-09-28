@@ -2,13 +2,10 @@
 Streamlit MVP Prototype: AP2 mandates + Aani-style payment simulation
 Filename: PaymentLabs_AP2_Aani_Demo.py
 
-Improvements:
-- Added step-by-step workflow with "Next Step" navigation.
-- Replaced placeholder demo names with realistic defaults.
-- Improved Payment Execution with clearer confirmation message.
-- Enhanced Audit Trail entries with richer context.
-- Removed redundant About & Run Instructions view.
-- Added landing page intro explaining demo purpose: AP2 + Open Finance + Aani.
+New improvement:
+- Added an **Introduction Page** as landing screen with "Start Demo" button.
+- User begins at Intro page and can only proceed forward.
+- Workflow: Intro → Step 1 (Consent) → Step 2 (Registry) → Step 3 (Payment) → Step 4 (Audit) → Restart.
 """
 
 import streamlit as st
@@ -83,18 +80,16 @@ if "agent_identity" not in st.session_state:
     }
 
 if "workflow_step" not in st.session_state:
-    st.session_state.workflow_step = "Intro"
+    st.session_state.workflow_step = "Landing"
 
 # ---------------------------
 # Page Config
 # ---------------------------
 
 st.set_page_config(page_title="AP2 + Aani Open Finance Demo", layout="wide")
-st.title("AP2 + Open Finance + Aani — Sandbox Demo")
-st.markdown("This demo shows how AP2 mandate logic can work on top of **Aani payments** in an **Open Finance** context. Workflow: Consent → Mandate Registry → Payment Execution → Audit Trail.")
 
 # ---------------------------
-# Navigation logic (step-by-step)
+# Navigation helper
 # ---------------------------
 
 def go_to(step):
@@ -103,10 +98,29 @@ def go_to(step):
 step = st.session_state.workflow_step
 
 # ---------------------------
+# Landing Page
+# ---------------------------
+
+if step == "Landing":
+    st.title("AP2 + Open Finance + Aani — Sandbox Demo")
+    st.markdown("""
+    ### Introduction
+    This sandbox demonstrates how **AP2 mandate logic** works on top of **Aani payments** in an **Open Finance** context.
+
+    **Workflow**:
+    1. User Consent (IntentMandate)
+    2. Mandate Registry
+    3. Payment Execution (mock Aani)
+    4. Audit Trail
+    """)
+    if st.button("🚀 Start Demo"):
+        go_to("Consent")
+
+# ---------------------------
 # Consent Screen
 # ---------------------------
 
-if step == "Intro":
+elif step == "Consent":
     st.header("Step 1 — User Consent: Create an IntentMandate")
     with st.form("consent_form"):
         user_name = st.text_input("User name", value="Mohammed Al Zarooni")
@@ -130,7 +144,7 @@ if step == "Intro":
         )
         st.session_state.mandates.insert(0, mandate)
         signed = sign_payload(mandate.to_dict())
-        audit_entry = {
+        st.session_state.audit_log.append({
             "event": "MANDATE_ISSUED",
             "mandate_id": mandate.mandate_id,
             "mandate_type": mandate.mandate_type,
@@ -138,8 +152,7 @@ if step == "Intro":
             "user": user_name,
             "timestamp": now_iso(),
             "signature": signed,
-        }
-        st.session_state.audit_log.append(audit_entry)
+        })
         st.success(f"IntentMandate {mandate_id} issued and recorded.")
 
     if st.button("Next Step → Mandate Registry"):
@@ -187,7 +200,7 @@ elif step == "Payment":
         if st.button("Execute Payment (mock Aani)"):
             response = mock_aani_payment_api(mandate.to_dict())
             mandate.status = response["status"]
-            audit_entry = {
+            st.session_state.audit_log.append({
                 "event": "PAYMENT_EXECUTED",
                 "mandate_id": mandate.mandate_id,
                 "transaction_id": response["transaction_id"],
@@ -196,8 +209,7 @@ elif step == "Payment":
                 "agent": st.session_state.agent_identity,
                 "signature": sign_payload({"mandate_id": mandate.mandate_id, "txid": response["transaction_id"]}),
                 "response": response,
-            }
-            st.session_state.audit_log.append(audit_entry)
+            })
             st.success(f"Payment executed. Transaction {response['transaction_id']} → {response['status']}")
             st.json(response)
     if st.button("Next Step → Audit Trail"):
@@ -216,5 +228,5 @@ elif step == "Audit":
         for entry in logs:
             with st.expander(f"{entry.get('timestamp', '')} — {entry.get('event')} — {entry.get('mandate_id','')}"):
                 st.json(entry)
-    if st.button("Restart Demo"):
-        go_to("Intro")
+    if st.button("🔄 Restart Demo"):
+        go_to("Landing")
