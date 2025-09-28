@@ -5,8 +5,9 @@ Filename: PaymentLabs_AP2_Aani_Demo.py
 Final version:
 - Static PNG workflow diagram embedded on Landing Page (from GitHub).
 - All steps: Consent -> CBUAE registration -> Registry -> Risk/AML -> Payment (Aani/UAEFTS) -> Audit.
-- Notes added for risk color coding and CBUAE registration (mock).
-- Fixed: Start Demo button now moves correctly to Consent step.
+- Risk screening color-coded (Green/Amber/Red).
+- Mock Aani API aligned with professional response format (always has settlementTime, processingCode, narrative).
+- Fixed: Start Demo + Next Step buttons now correctly advance with st.rerun().
 """
 
 import streamlit as st
@@ -34,14 +35,33 @@ def sign_payload(payload: Dict[str, Any], secret: str = "demo_secret_key") -> st
 def mock_aani_payment_api(mandate: Dict[str, Any], rail: str) -> Dict[str, Any]:
     txid = "TX-" + uuid.uuid4().hex[:12].upper()
     status = random.choice(["SETTLED", "PENDING", "FAILED"])
+
+    if status == "SETTLED":
+        settlement_time = now_iso()
+        processing_code = "00"
+        narrative = "Payment successful"
+    elif status == "PENDING":
+        settlement_time = now_iso()  # simulate expected completion
+        processing_code = "09"
+        narrative = "Payment pending"
+    else:  # FAILED
+        settlement_time = now_iso()
+        processing_code = "05"
+        narrative = "Payment failed"
+
     response = {
-        "transaction_id": txid,
+        "transactionId": txid,
         "status": status,
-        "settlement_time": now_iso() if status == "SETTLED" else None,
-        "amount": mandate.get("amount"),
+        "amount": f"{mandate.get('amount'):.2f}",
         "currency": mandate.get("currency", "AED"),
         "rail": rail,
-        "meta": {"processor": "Aani-mock" if rail == "Aani" else "UAEFTS-mock", "mode": "test"}
+        "settlementTime": settlement_time,
+        "processingCode": processing_code,
+        "narrative": narrative,
+        "meta": {
+            "processor": "Aani-mock" if rail == "Aani" else "UAEFTS-mock",
+            "mode": "test"
+        }
     }
     return response
 
@@ -253,15 +273,15 @@ elif step == "Payment":
             st.session_state.audit_log.append({
                 "event": "PAYMENT_EXECUTED",
                 "mandate_id": mandate.mandate_id,
-                "transaction_id": response["transaction_id"],
+                "transaction_id": response["transactionId"],
                 "status": response["status"],
                 "rail": rail,
                 "timestamp": now_iso(),
                 "agent": st.session_state.agent_identity,
-                "signature": sign_payload({"mandate_id": mandate.mandate_id, "txid": response["transaction_id"]}),
+                "signature": sign_payload({"mandate_id": mandate.mandate_id, "txid": response["transactionId"]}),
                 "response": response,
             })
-            st.success(f"Payment executed on {rail}. Transaction {response['transaction_id']} → {response['status']}")
+            st.success(f"Payment executed on {rail}. Transaction {response['transactionId']} → {response['status']}")
             st.json(response)
     if st.button("Next Step → Audit Trail"):
         go_to("Audit")
