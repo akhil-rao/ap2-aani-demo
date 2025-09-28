@@ -6,6 +6,7 @@ Final version:
 - Static PNG workflow diagram embedded on Landing Page (from GitHub).
 - All steps: Consent -> CBUAE registration -> Registry -> Risk/AML -> Payment (Aani/UAEFTS) -> Audit.
 - Notes added for risk color coding and CBUAE registration (mock).
+- Fixed: Start Demo button now moves correctly to Consent step.
 """
 
 import streamlit as st
@@ -138,6 +139,7 @@ if step == "Landing":
 
     if st.button("Start Demo"):
         go_to("Consent")
+        st.rerun()
 
 # ---------------------------
 # Consent Screen
@@ -186,6 +188,7 @@ elif step == "Consent":
 
     if st.button("Next Step → Mandate Registry"):
         go_to("Registry")
+        st.rerun()
 
 # ---------------------------
 # Mandate Registry
@@ -200,6 +203,7 @@ elif step == "Registry":
         st.table(rows)
     if st.button("Next Step → Risk & AML Check"):
         go_to("RiskAML")
+        st.rerun()
 
 # ---------------------------
 # Risk & AML Check
@@ -229,6 +233,7 @@ elif step == "RiskAML":
                 st.error(f"Risk screening complete. Risk level: {risk}")
     if st.button("Next Step → Payment Execution"):
         go_to("Payment")
+        st.rerun()
 
 # ---------------------------
 # Payment Execution
@@ -260,6 +265,7 @@ elif step == "Payment":
             st.json(response)
     if st.button("Next Step → Audit Trail"):
         go_to("Audit")
+        st.rerun()
 
 # ---------------------------
 # Audit Trail
@@ -275,3 +281,4 @@ elif step == "Audit":
                 st.json(entry)
     if st.button("🔄 Restart Demo"):
         go_to("Landing")
+        st.rerun()
